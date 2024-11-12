@@ -252,54 +252,56 @@ func Run(options Settings) (*CobaltResponse, error) {
 
 //Cobalt response end
 
-type CobaltInstance struct {
-	Trust     string   `json:"trust"`
-	APIOnline bool     `json:"api_online"`
-	Cors      int      `json:"cors"`
-	Commit    string   `json:"commit"`
-	Services  Services `json:"services,omitempty"`
-	Version   string   `json:"version"`
-	Branch    string   `json:"branch"`
-	Score     float64  `json:"score"`
-	Protocol  string   `json:"protocol"`
-	Name      string   `json:"name"`
-	StartTime int64    `json:"startTime"`
-	API       string   `json:"api"`
-	FrontEnd  string   `json:"frontEnd"`
-	Turnstile bool     `json:"turnstile"`
+// CobaltInstance is a struct that contains information about a cobalt instance.
+type CobaltInstance []struct {
+	API      string       `json:"api"`
+	Branch   string       `json:"branch"`
+	Commit   string       `json:"commit"`
+	Cors     bool         `json:"cors"`
+	Frontend string       `json:"frontend"`
+	Name     string       `json:"name"`
+	Nodomain bool         `json:"nodomain"`
+	Online   OnlineStatus `json:"online"`
+	Protocol string       `json:"protocol"`
+	Score    int          `json:"score"`
+	//Services EnabledServices `json:"services"`
+	Trust   int    `json:"trust"`
+	Version string `json:"version"`
 }
-
-type Services struct {
-	Youtube       bool `json:"youtube"`
-	Facebook      bool `json:"facebook"`
-	Rutube        bool `json:"rutube"`
-	Tumblr        bool `json:"tumblr"`
-	Bilibili      bool `json:"bilibili"`
-	Pinterest     bool `json:"pinterest"`
-	Instagram     bool `json:"instagram"`
-	Soundcloud    bool `json:"soundcloud"`
-	YoutubeMusic  bool `json:"youtube_music"`
-	Odnoklassniki bool `json:"odnoklassniki"`
-	Dailymotion   bool `json:"dailymotion"`
-	Snapchat      bool `json:"snapchat"`
-	Twitter       bool `json:"twitter"`
-	Loom          bool `json:"loom"`
-	Vimeo         bool `json:"vimeo"`
-	Streamable    bool `json:"streamable"`
-	Vk            bool `json:"vk"`
-	Tiktok        bool `json:"tiktok"`
-	Reddit        bool `json:"reddit"`
-	TwitchClips   bool `json:"twitch_clips"`
-	YoutubeShorts bool `json:"youtube_shorts"`
-	Vine          bool `json:"vine"`
+type OnlineStatus struct {
+	API      bool `json:"api"`
+	Frontend bool `json:"frontend"`
+}
+type EnabledServices struct {
+	Bilibili      bool   `json:"bilibili"`
+	BilibiliTv    bool   `json:"bilibili_tv"`
+	Bluesky       bool   `json:"bluesky"`
+	Dailymotion   bool   `json:"dailymotion"`
+	Facebook      bool   `json:"facebook"`
+	Instagram     bool   `json:"instagram"`
+	Loom          bool   `json:"loom"`
+	Odnoklassniki bool   `json:"odnoklassniki"`
+	Pinterest     bool   `json:"pinterest"`
+	Reddit        bool   `json:"reddit"`
+	Rutube        bool   `json:"rutube"`
+	Snapchat      bool   `json:"snapchat"`
+	Soundcloud    bool   `json:"soundcloud"`
+	Streamable    bool   `json:"streamable"`
+	Tiktok        bool   `json:"tiktok"`
+	Tumblr        bool   `json:"tumblr"`
+	Twitch        bool   `json:"twitch"`
+	Twitter       bool   `json:"twitter"`
+	Vimeo         bool   `json:"vimeo"`
+	Vine          bool   `json:"vine"`
+	Vk            bool   `json:"vk"`
+	Youtube       string `json:"youtube"`
+	YoutubeMusic  string `json:"youtube_music"`
+	YoutubeShorts string `json:"youtube_shorts"`
 }
 
 // GetCobaltInstances makes a request to instances.hyper.lol and returns a list of all online cobalt instances.
-func GetCobaltInstances() ([]CobaltInstance, error) {
-	//Temporary disabled due of instance scraping abuse.
-	return nil, errors.New("service unavailable")
-
-	res, err := genericHttpRequest("https://instances.hyper.lol/instances.json", http.MethodGet, nil)
+func GetCobaltInstances() (CobaltInstance, error) {
+	res, err := genericHttpRequest("https://instances.cobalt.best/api/instances.json", http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -310,13 +312,13 @@ func GetCobaltInstances() ([]CobaltInstance, error) {
 		return nil, err
 	}
 
-	var listOfCobaltInstances []CobaltInstance
+	var listOfCobaltInstances CobaltInstance
 	err = json.Unmarshal(jsonbody, &listOfCobaltInstances)
 	if err != nil {
 		return nil, err
 	}
 
-	parseModernInstances := make([]CobaltInstance, 0)
+	parseModernInstances := make(CobaltInstance, 0)
 	for _, v := range listOfCobaltInstances {
 		if version.Compare(v.Version, "10.0.0", ">=") {
 			parseModernInstances = append(parseModernInstances, v)
@@ -325,8 +327,10 @@ func GetCobaltInstances() ([]CobaltInstance, error) {
 	}
 
 	return parseModernInstances, nil
+	//return listOfCobaltInstances, nil
 }
 
+// Deprecated: Cobalt response returns the file name and size.
 type MediaInfo struct {
 	Size uint   //Media size in bytes.
 	Name string //Media name.
