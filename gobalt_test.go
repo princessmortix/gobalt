@@ -2,6 +2,7 @@ package gobalt
 
 import (
 	"math/rand/v2"
+	"strings"
 	"testing"
 )
 
@@ -16,6 +17,29 @@ func TestCobaltDownload(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	t.Log(runDlTest.URL)
+}
+
+func TestCobaltDownloadNoApiKey(t *testing.T) {
+	testDownload := CreateDefaultSettings()
+	testDownload.Url = "https://www.youtube.com/watch?v=notreal"
+	ApiKey = ""
+	CobaltApi = "https://cobalt-backend.canine.tools"
+	_, err := Run(testDownload)
+	if !strings.Contains(err.Error(), "error.api.auth.key.invalid") {
+		t.Fatalf("expected error, got %v", err)
+	}
+	t.Log("Got expected error, test passed.")
+}
+
+func TestCobaltDownloadInvalid(t *testing.T) {
+	testDownload := CreateDefaultSettings()
+	testDownload.Url = "https://www.youtube.com/watch?v=notreal"
+	CobaltApi = "https://cobalt-api.kwiatekmiki.com"
+	_, err := Run(testDownload)
+	if !strings.Contains(err.Error(), "error.api.content.video.unavailable") {
+		t.Fatalf("expected error, got %v", err)
+	}
+	t.Log("Got expected error, test passed.")
 }
 
 func TestCustomInstancesList(t *testing.T) {
@@ -68,9 +92,5 @@ func TestPlaylistGet(t *testing.T) {
 	}
 	if a[0] != "https://youtu.be/gYygotHLyjo" {
 		t.Fatalf("got unexpected link: %v, instead of https://youtu.be/gYygotHLyjo", a[0])
-	}
-	t.Log("Urls of the playlist:")
-	for _, v := range a {
-		t.Log(v)
 	}
 }

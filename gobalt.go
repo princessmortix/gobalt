@@ -25,7 +25,7 @@ var (
 	Client    = http.Client{
 		Timeout: 10 * time.Second,
 	} //This allows you to modify the HTTP Client used in requests. This Client will be re-used.
-	useragent = fmt.Sprintf("gobalt/2.0.2 (+https://github.com/lostdusty/gobalt/v2; go/%v; %v/%v)", runtime.Version(), runtime.GOOS, runtime.GOARCH)
+	useragent = fmt.Sprintf("gobalt/2.0.7 (+https://github.com/lostdusty/gobalt/v2; go/%v; %v/%v)", runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	ApiKey    = os.Getenv("COBALT_API_KEY") //Some instances need an API key to work, set it here. Default is from environment variable `COBALT_API_KEY`.
 )
 
@@ -192,6 +192,40 @@ type Error struct {
 	Context Context `json:"context"` //(optional) container for providing more context.
 }
 
+var (
+	// Map machine-readable error codes to human-readable error messages.
+	ErrDescriptions = map[string]string{
+		"error.api.auth.key.invalid":          "no api key was provided, please provide an api key to use this server",
+		"error.api.auth.jwt.missing":          "this server supports API keys, but you didn't provide one",
+		"error.api.auth.jwt.invalid":          "the api key you provided is invalid",
+		"error.api.auth.turnstile.missing":    "this instance uses turnstile",
+		"error.api.auth.turnstile.invalid":    "the turnstile token you provided is invalid",
+		"error.api.rate_exceeded":             "you are making too many requests! try again later",
+		"error.api.capacity":                  "this cobalt server can't process your request right now",
+		"error.api.generic":                   "something went wrong on the server side, try again, and if it still doesn't work, contact the server owner",
+		"error.api.unknown_response":          "the server returned an unknown response",
+		"error.api.service.unsupported":       "this cobalt server doesn't support the service you're trying to use",
+		"error.api.service.disabled":          "the service you're trying to download is disabled on this server",
+		"error.api.link.invalid":              "the link you provided is invalid, is this a valid link?",
+		"error.api.link.unsupported":          "the link you provided is supported, but cobalt couldn't recognize it, is your link correct?",
+		"error.api.fetch.fail":                "an unknown error occurred while fetching the media, does this link works?",
+		"error.api.fetch.critical":            "the service you're trying to download is returning something unexpected, try again later",
+		"error.api.fetch.empty":               "the service you're trying to download is returning an empty response, try again later",
+		"error.api.fetch.rate":                "the cobalt server got rate-limited by the service you're trying to download, try again later",
+		"error.api.content.too_long":          "the media you're trying to download is too long, try downloading a shorter video",
+		"error.api.content.video.unavailable": "either the video you're trying to download is region-locked, or the service is blocking cobalt",
+		"error.api.content.video.live":        "the video you're trying to download is live, and cobalt can't download live videos",
+		"error.api.content.video.age":         "the video you're trying to download is age-restricted, and cobalt can't download age-restricted videos",
+		"error.api.content.video.private":     "the video you're trying to download is private, make sure it's public or unlisted",
+		"error.api.content.video.region":      "the video you're trying to download is region restricted",
+		"error.api.youtube.codec":             "try using a different codec, this video doesn't have the codec you're trying to download",
+		"error.api.youtube.decipher":          "cobalt couldn't decipher the video, try again later",
+		"error.api.youtube.login":             "youtube marked the processing server as a bot, tell the owner to check cookies",
+		"error.api.youtube.token_expired":     "the youtube token expired, try again in a few seconds, but if it still doesn't work, tell the instance owner about this error",
+		"error.api.youtube.no_hls_streams":    "the video you're trying to download doesn't have any HLS streams, try other settings",
+	}
+)
+
 type Context struct {
 	Service string `json:"service"`         //What service failed.
 	Limit   int    `json:"limit,omitempty"` //Number providing the ratelimit maximum number of requests, or maximum downloadable video duration
@@ -242,7 +276,7 @@ func Run(options Settings) (*CobaltResponse, error) {
 	}
 
 	if media.Status == "error" {
-		return nil, fmt.Errorf("cobalt rejected our request: %v", media.Error.Code)
+		return nil, fmt.Errorf("cobalt rejected our request with the following reason: %v (%v)", ErrDescriptions[media.Error.Code], media.Error.Code)
 	}
 
 	return &media, nil
