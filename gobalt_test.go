@@ -36,7 +36,7 @@ func TestCobaltDownloadInvalid(t *testing.T) {
 	testDownload.Url = "https://www.youtube.com/watch?v=notreal"
 	CobaltApi = "https://cobalt-api.kwiatekmiki.com"
 	_, err := Run(testDownload)
-	if !strings.Contains(err.Error(), "error.api.content.video.unavailable") {
+	if err.Error() != "error.api.content.video.unavailable" || err.Error() != "error.api.fetch.critical" {
 		t.Fatalf("expected error, got %v", err)
 	}
 	t.Log("Got expected error, test passed.")
