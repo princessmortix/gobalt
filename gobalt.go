@@ -223,6 +223,9 @@ var (
 		"error.api.youtube.login":             "youtube marked the processing server as a bot, tell the owner to check cookies",
 		"error.api.youtube.token_expired":     "the youtube token expired, try again in a few seconds, but if it still doesn't work, tell the instance owner about this error",
 		"error.api.youtube.no_hls_streams":    "the video you're trying to download doesn't have any HLS streams, try other settings",
+		"error.net.failed":                    "unable to connect to the cobalt server, check your internet connection, the server status, and try again",
+		"error.net.generic":                   "an unknown error occurred while connecting to the cobalt server.",
+		"error.net.invalid_response":          "the cobalt server returned an invalid response, try again later",
 	}
 )
 
@@ -232,21 +235,22 @@ type Context struct {
 }
 
 // Run(gobalt.Settings) sends the request to the provided cobalt api and returns the server response (gobalt.CobaltResponse) and error, use this to download something AFTER setting your desired configuration.
+// Use ErrDescriptions to get a human-readable error message from the error code.
 func Run(options Settings) (*CobaltResponse, error) {
 	//Check if an url is set.
 	if options.Url == "" {
-		return nil, errors.New("no url was provided in Settings.Url")
+		return nil, errors.New("no url was provided to download")
 	}
 
 	//Do a basic check to see if the server is online and handling requests
 	_, err := CobaltServerInfo(CobaltApi)
 	if err != nil {
-		return nil, fmt.Errorf("hello to cobalt instance %v failed, reason: %v", CobaltApi, err)
+		return nil, fmt.Errorf("error.net.generic: %v", err)
 	}
 
 	jsonBody, err := json.Marshal(options)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal json body due of the following error: %v", err)
+		return nil, fmt.Errorf("error.net.invalid_response")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, CobaltApi, strings.NewReader(string(jsonBody)))
@@ -260,23 +264,23 @@ func Run(options Settings) (*CobaltResponse, error) {
 
 	res, err := Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("unable to send your request, %v", err)
+		return nil, fmt.Errorf("error.net.failed")
 	}
 	defer res.Body.Close()
 
 	jsonbody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error.net.invalid_response")
 	}
 
 	var media CobaltResponse
 	err = json.Unmarshal(jsonbody, &media)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error.net.invalid_response")
 	}
 
 	if media.Status == "error" {
-		return nil, fmt.Errorf("cobalt rejected our request with the following reason: %v (%v)", ErrDescriptions[media.Error.Code], media.Error.Code)
+		return nil, fmt.Errorf("%v", media.Error.Code)
 	}
 
 	return &media, nil
@@ -372,6 +376,7 @@ type MediaInfo struct {
 }
 
 // ProcessMedia(url) attempts to fetch the file size, mime type and name.
+// Deprecated: Cobalt response returns the file name and size.
 func ProcessMedia(url string) (*MediaInfo, error) {
 	req, err := genericHttpRequest(url, http.MethodHead, nil)
 	if err != nil {
@@ -407,9 +412,6 @@ func GetYoutubePlaylist(playlist string) (Playlist, error) {
 	newYoutubePlaylistUrl, err := url.Parse(playlist)
 	if err != nil {
 		return nil, err
-	}
-	if !strings.HasSuffix(newYoutubePlaylistUrl.Host, "youtube.com") || newYoutubePlaylistUrl.Path != "/playlist" {
-		return nil, errors.New("non youtube playlist url provided")
 	}
 
 	getUrls, err := genericHttpRequest(fmt.Sprintf("https://playlist.kwiatekmiki.pl/api/getvideos?url=%v", newYoutubePlaylistUrl.String()), http.MethodGet, nil)
