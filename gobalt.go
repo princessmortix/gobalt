@@ -21,11 +21,11 @@ import (
 )
 
 var (
-	CobaltApi = "https://cobalt-backend.canine.tools" //Override this value to use your own cobalt instance. See https://instances.hyper.lol/ for alternatives from the main instance.
+	CobaltApi = "https://cobalt-api.kwiatekmiki.com" //Override this value to use your own cobalt instance. See https://instances.cobalt.best for alternatives from the main instance.
 	Client    = http.Client{
 		Timeout: 10 * time.Second,
 	} //This allows you to modify the HTTP Client used in requests. This Client will be re-used.
-	useragent = fmt.Sprintf("gobalt/2.0.7 (+https://github.com/lostdusty/gobalt/v2; go/%v; %v/%v)", runtime.Version(), runtime.GOOS, runtime.GOARCH)
+	useragent = fmt.Sprintf("gobalt/2.0.9 (+https://github.com/lostdusty/gobalt/v2; go/%v; %v/%v)", runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	ApiKey    = os.Getenv("COBALT_API_KEY") //Some instances need an API key to work, set it here. Default is from environment variable `COBALT_API_KEY`.
 )
 
@@ -109,6 +109,7 @@ type Settings struct {
 	VideoQuality          int          `json:"videoQuality,string"`   //144p to 2160p (4K), if not specified will default to 1080p.
 	YoutubeDubbedAudio    bool         `json:"youtubeDubBrowserLang"` //Downloads the YouTube dubbed audio according to the value set in YoutubeDubbedLanguage (and if present). Default is English (US). Follows the ISO 639-1 standard.
 	YoutubeDubbedLanguage string       `json:"youtubeDubLang"`        //Language code to download the dubbed audio, Default is "en".
+	YoutubeHLS            bool         `json:"youtubeHLS"`            //Enables downloading YouTube videos using HLS streams. (Less prone to fail) Default: true
 	YoutubeVideoFormat    videoCodecs  `json:"youtubeVideoCodec"`     //Which video format to download from YouTube, see videoCodecs type for details.
 }
 
@@ -170,6 +171,7 @@ func CreateDefaultSettings() Settings {
 		TwitterConvertGif:     true,
 		Mode:                  Auto,
 		YoutubeDubbedLanguage: "en",
+		YoutubeHLS:            true,
 	}
 	return options
 }
@@ -177,14 +179,15 @@ func CreateDefaultSettings() Settings {
 // Cobalt response to your request
 type CobaltResponse struct {
 	Status string      `json:"status"` //4 possible status. Error = Something went wrong, see CobaltResponse.Error.Code | Tunnel or Redirect = Everything is right. | Picker = Multiple media, see CobaltResponse.Picker.
-	Picker *[]struct { //This is an array of items, each containing the media type, url to download and thumbnail.
+	Picker *[]struct { //This is an array of items, each containing the media type, url to download and thumbnail. May be <NIL> if the status is not picker.
 		Type  string `json:"type"`  //Type of the media, either photo, video or gif
 		URL   string `json:"url"`   //Url to download.
 		Thumb string `json:"thumb"` //Media preview url, optional.
 	} `json:"picker"`
-	URL      string `json:"url"`      //Returns the download link. If the status is picker this field will be empty. Direct link to a file or a link to cobalt's live render.
-	Filename string `json:"filename"` //Various text, mostly used for errors.
-	Error    *Error `json:"error"`    //Error information, may be <NIL> if theres no error.
+	URL      string     `json:"url"`      //Returns the download link. If the status is picker this field will be empty. Direct link to a file or a link to cobalt's live render.
+	Filename string     `json:"filename"` //Various text, mostly used for errors.
+	Error    *Error     `json:"error"`    //Error information, may be <NIL> if theres no error.
+	Server   ServerInfo //Server information, see ServerInfo struct.
 }
 
 type Error struct {
@@ -229,6 +232,14 @@ var (
 	}
 )
 
+// ResolveError(error) returns a human-readable error message from the error code.
+func ResolveError(code error) string {
+	if val, ok := ErrDescriptions[code.Error()]; ok {
+		return fmt.Sprintf("%v (%v)", val, code.Error())
+	}
+	return code.Error()
+}
+
 type Context struct {
 	Service string `json:"service"`         //What service failed.
 	Limit   int    `json:"limit,omitempty"` //Number providing the ratelimit maximum number of requests, or maximum downloadable video duration
@@ -243,6 +254,7 @@ func Run(options Settings) (*CobaltResponse, error) {
 	}
 
 	//Do a basic check to see if the server is online and handling requests
+	//Also add to CobaltResponse the server information.
 	_, err := CobaltServerInfo(CobaltApi)
 	if err != nil {
 		return nil, fmt.Errorf("error.net.generic: %v", err)
@@ -337,7 +349,7 @@ type EnabledServices struct {
 	YoutubeShorts string `json:"youtube_shorts"`
 }
 
-// GetCobaltInstances makes a request to instances.hyper.lol and returns a list of all online cobalt instances.
+// GetCobaltInstances makes a request to instances.cobalt.best and returns a list of all online cobalt instances.
 func GetCobaltInstances() (CobaltInstance, error) {
 	res, err := genericHttpRequest("https://instances.cobalt.best/api/instances.json", http.MethodGet, nil)
 	if err != nil {

@@ -8,7 +8,7 @@ import (
 
 func TestCobaltDownload(t *testing.T) {
 	dlTest := CreateDefaultSettings()
-	dlTest.Url = "https://www.youtube.com/watch?v=bV68_Vy0Uis&list=RD-Sr668sSEIA&index=19"
+	dlTest.Url = "https://www.youtube.com/watch?v=ud4cyuj2Z3A"
 	dlTest.AudioFormat = Ogg
 	dlTest.YoutubeVideoFormat = VP9
 	CobaltApi = "https://cobalt-api.kwiatekmiki.com"
@@ -16,7 +16,10 @@ func TestCobaltDownload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	t.Log(runDlTest.URL)
+	if !strings.Contains(runDlTest.Filename, "Sullivan King - Thrones of Blood") {
+		t.Logf("Did not get the expected filename, got %v", runDlTest.Filename)
+		t.FailNow()
+	}
 }
 
 func TestCobaltDownloadNoApiKey(t *testing.T) {
@@ -36,8 +39,8 @@ func TestCobaltDownloadInvalid(t *testing.T) {
 	testDownload.Url = "https://www.youtube.com/watch?v=notreal"
 	CobaltApi = "https://cobalt-api.kwiatekmiki.com"
 	_, err := Run(testDownload)
-	if err.Error() != "error.api.content.video.unavailable" || err.Error() != "error.api.fetch.critical" {
-		t.Fatalf("expected error, got %v", err)
+	if err.Error() != "error.api.fetch.critical" {
+		t.Fatalf("expected error, got: %v", ResolveError(err))
 	}
 	t.Log("Got expected error, test passed.")
 }
